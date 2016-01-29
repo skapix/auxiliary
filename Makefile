@@ -1,2 +1,2 @@
 all:
-	gcc main.c -o msg
+	gcc main.c -o msg -lrt
