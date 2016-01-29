@@ -1,44 +1,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
+#include <sys/mman.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-struct message {
-    long mtype;
-    char mtext[80];
-};
+const char * g_sm_name = "/test.shm";
+const size_t g_sm_size = 1*1024*1024;
 
-//const char * dir = "/tmp/msg.temp";
-//const char * g_outpath = "/home/box/message.txt";
-const char * g_dir = "/home/skap/README";
-const char * g_outpath = "output";
-
-
-int main(){
-	key_t key = ftok(g_dir, 0);
-	if (key == -1){
-		printf("ftok: %s\n", strerror(errno));
-		return 0;
+#define d_pe_exit(descr, funcname)\
+	if ((int)(descr) == -1) {\
+		printf("funcname: %s\n", strerror(errno));\
+		return 0;\
 	}
+
+int main() {
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-	int msgid = msgget(key, mode | IPC_CREAT);
-	if (msgid == -1) {
-		printf("msgid: %s\n", strerror(errno));
-		return 0;
-	}
-	struct message msg;
-	int got = msgrcv(msgid, &msg, 80, 0, 0);
-	if (got == -1){
-		printf("msgrcv: %s\n", strerror(errno));
-		return 0;
-	}
-	FILE * f = fopen(g_outpath, "wb");
-	fwrite(msg.mtext, sizeof(char), got, f);
-	fclose(f);
+	int descr = shm_open(g_sm_name, O_RDWR | O_CREAT, mode); 
+	d_pe_exit(descr, shm_open);
+	d_pe_exit(ftruncate(descr, g_sm_size), ftruncate);
+	void * mem = mmap(NULL, g_sm_size, PROT_READ | PROT_WRITE, MAP_SHARED, descr, 0);
+	d_pe_exit(mem, mmap);
+	//some work
+	memset(mem, 13, g_sm_size);
+	int c = getchar();
+	munmap(mem, g_sm_size);
+	shm_unlink(g_sm_name); 
 
-	return 0;
 }
